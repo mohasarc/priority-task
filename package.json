@@ -1,0 +1,36 @@
+{
+  "name": "ptask.js",
+  "version": "0.0.1",
+  "description": "Priority based task runner. ",
+  "main": "./dist/index.js",
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "test": "jest",
+    "prepublish": "git push --tags"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mohasarc/Ptask.js.git"
+  },
+  "keywords": [
+    "npm",
+    "PriorityTask",
+    "PriorityScheduler",
+    "Scheduler",
+    "TaskRunner"
+  ],
+  "sideEffects": false,
+  "author": "Mohammed S. Yaseen",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mohasarc/Ptask.js/issues"
+  },
+  "homepage": "https://github.com/mohasarc/Ptask.js#readme",
+  "devDependencies": {
+    "jest": "^26.6.3",
+    "ts-node": "^10.1.0"
+  }
+}
