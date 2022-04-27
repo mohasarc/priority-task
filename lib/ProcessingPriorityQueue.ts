@@ -1,5 +1,5 @@
 import FastPriorityQueue from "fastpriorityqueue";
-import PTask from "./PTask";
+import { PTask } from "./PTask";
 import SubscribableQueueItem from "./SubscribableQueueItem";
 
 /**
@@ -20,6 +20,10 @@ export default class ProcessingPriorityQueue {
    * TODO add comments
    */
   private priorityQueue: FastPriorityQueue<SubscribableQueueItem>;
+
+  private currentlyRunning = new Array<SubscribableQueueItem>();
+
+  private paused = new Array<SubscribableQueueItem>();
 
   private constructor(private concurrencyCount: number = 1) {
     this.existingRequestsMap = new Map<number, boolean>();
@@ -46,7 +50,7 @@ export default class ProcessingPriorityQueue {
       this.existingRequestsMap.set(ptask.key, true);
       this.priorityQueue.add(subscribableItem);
     }
-    
+
     const promise = subscribableItem.createPromise();
     setImmediate(() => {
       this.process();
@@ -82,9 +86,8 @@ export default class ProcessingPriorityQueue {
   }
 
   public async prioritize(key: number, priority: number): Promise<void> {
-    const comparisonFunction = (
-      actionableQueueItem: SubscribableQueueItem
-    ) => actionableQueueItem.task.key === key;
+    const comparisonFunction = (item: SubscribableQueueItem) =>
+      item.task.key === key;
     const queueItemTemp = this.priorityQueue.removeOne(comparisonFunction);
 
     if (queueItemTemp) {
@@ -94,13 +97,47 @@ export default class ProcessingPriorityQueue {
   }
 
   public cancel(key: number): void {
-    const comparisonFunction = <P>(
-      actionableQueueItem: SubscribableQueueItem
-    ) => actionableQueueItem.task.key === key;
+    const comparisonFunction = <P>(item: SubscribableQueueItem) =>
+      item.task.key === key;
     const queueItemTemp = this.priorityQueue.removeOne(comparisonFunction);
 
     if (queueItemTemp) {
       this.existingRequestsMap.set(key, false);
+    }
+  }
+
+  public async pause(ptask: PTask<any, any>): Promise<any> {
+    /**
+     * Check if the task was already paused
+     */
+    if (this.paused.find((item) => item.task === ptask)) {
+      return null;
+    }
+
+    /**
+     * Check if the task is currently running
+     */
+    const currentlyRunningItem = this.currentlyRunning.find(
+      (item) => item.task === ptask
+    );
+
+    if (currentlyRunningItem) {
+      currentlyRunningItem.paused = true;
+      this.paused.push(currentlyRunningItem);
+      return currentlyRunningItem.createPromise('immediate');
+    }
+
+    /**
+     * Check if the task hasn't started yet
+     */
+    const queueItem = this.priorityQueue.removeOne(
+      (item: SubscribableQueueItem) => item.task === ptask
+    );
+
+    if (queueItem) {
+      queueItem.paused = true;
+      this.paused.push(queueItem);
+      return null;
     }
   }
 
@@ -109,9 +146,10 @@ export default class ProcessingPriorityQueue {
       this.concurrencyCount--;
 
       const item = this.popItem();
+      this.currentlyRunning.push(item);
       /* Process the item with the given procedure */
       item.task
-        .onRun(item.task.args)
+        .onRun(item.task.args, item.task.execInfo)
         .then((result) => {
           item.resolveCallback(result);
         })
@@ -119,6 +157,11 @@ export default class ProcessingPriorityQueue {
           item.rejectCallback(error);
         })
         .finally(async () => {
+          // remove from currently running
+          this.currentlyRunning = this.currentlyRunning.filter(
+            (item) => item !== item
+          );
+
           this.concurrencyCount++;
           this.process();
         });

@@ -1,3 +1,2 @@
-import PTask from "./PTask";
-
-export default PTask;
+import { PTask, ExecInfo } from "./PTask";
+export { PTask, ExecInfo };
