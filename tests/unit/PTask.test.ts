@@ -294,5 +294,45 @@ describe("PriorityTask", () => {
       expect(res).toEqual([1, 2, 3]);
       done();
     });
-  })
+  });
+
+  it('should update the priority of a task', (done) => {
+    // Prepare tasks
+    const task1 = new PTask<number, number>({
+      priority: 1,
+      args: 1,
+      onRun: async (a: number) => a,
+    });
+
+    const task2 = new PTask<number, number>({
+      priority: 2,
+      args: 2,
+      onRun: async (a: number) => a,
+    });
+
+    const task3 = new PTask<number, number>({
+      priority: 3,
+      args: 3,
+      onRun: async (a: number) => a,
+    });
+
+    const res = [];
+    const p2 = task2.run().then((val) => res.push(val));
+    const p1 = task1.run().then((val) => res.push(val));
+    const p3 = task3.run().then((val) => res.push(val));
+
+    task2.setPriority(6);
+    task1.setPriority(5);
+
+    Promise.all([p1, p2, p3]).then(() => {
+      expect(res).toEqual([2, 1, 3]);
+      done();
+    });
+  });
+
+  // TODO use function for priority
+
+  // TODO use callback for cancel
+
+  // TODO pause multiple times
 });

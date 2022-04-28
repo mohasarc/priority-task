@@ -88,4 +88,9 @@ export class PTask<T, R> {
     ProcessingPriorityQueue.getInstance().cancel(this, abort);
     this.onCancel();
   }
+
+  public setPriority(p: number | (() => number)){
+    this.priority = p;
+    ProcessingPriorityQueue.getInstance().updatePriority(this);
+  }
 }

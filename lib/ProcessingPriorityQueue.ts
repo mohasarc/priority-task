@@ -85,15 +85,11 @@ export default class ProcessingPriorityQueue {
     return item;
   }
 
-  public async prioritize(key: number, priority: number): Promise<void> {
+  public updatePriority(ptask: PTask<any, any>): void {
     const comparisonFunction = (item: SubscribableQueueItem) =>
-      item.task.key === key;
+      item.task.key === ptask.key;
     const queueItemTemp = this.priorityQueue.removeOne(comparisonFunction);
-
-    if (queueItemTemp) {
-      queueItemTemp.task.priority = priority;
-      this.priorityQueue.add(queueItemTemp);
-    }
+    if (queueItemTemp) this.priorityQueue.add(queueItemTemp);
   }
 
   public async cancel(ptask: PTask<any, any>, abort: boolean): Promise<void> {
