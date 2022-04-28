@@ -12,8 +12,9 @@ interface PTaskOptions<T, R> {
    * @param resSoFar The result so far returned from the execution of onRun. Null if the task hasn't yet started.
    */
   onPause?: (args: T, resSoFar: R | null) => T;
-  onResume?: () => void;
+  onResume?: (args: T, resSoFar: R | null) => T;
   onCancel?: () => void;
+  resultsMerge?: (resSoFar: R | null, newResult: R) => R;
 }
 
 export interface ExecInfo {
@@ -31,13 +32,17 @@ export class PTask<T, R> {
 
   args: any;
 
+  private resSoFar: R | null = null;
+
   onRun: (args: T, execInfo?: ExecInfo) => Promise<R>;
 
   onPause: (args: T, resSoFar: R | null) => T;
 
-  onResume: () => void;
+  onResume: (args: T, resSoFar: R | null) => T;
 
   onCancel: () => void;
+
+  resultsMerge?: (resSoFar: R | null, newResult: R) => R;
 
   execInfo = {
     paused: false,
@@ -49,18 +54,26 @@ export class PTask<T, R> {
     this.args = options.args;
     this.onRun = options.onRun;
     this.onPause = options.onPause || ((arg: T) => arg);
-    this.onResume = options.onResume || (() => {});
+    this.onResume = options.onResume || ((arg: T) => arg);
     this.onCancel = options.onCancel || (() => {});
+    this.resultsMerge = options.resultsMerge || ((resSoFar: R | null, newResult: R) => newResult);
   }
 
-  public run(): Promise<R> {
-    return ProcessingPriorityQueue.getInstance().enqueue(this);
+  public async run(): Promise<R> {
+    const newRes = await ProcessingPriorityQueue.getInstance().enqueue(this);
+    return this.resultsMerge(this.resSoFar, newRes);
   }
 
-  public pause(): void {
-    ProcessingPriorityQueue.getInstance().pause(this).then((resSoFar) => {
-      this.args = this.onPause(this.args, resSoFar);
-    });
+  public async pause(): Promise<void> {
     this.execInfo.paused = true;
+    const newRes = await ProcessingPriorityQueue.getInstance().pause(this);
+    this.resSoFar = this.resultsMerge(this.resSoFar, newRes);
+    this.args = this.onPause(this.args, this.resSoFar);
+  }
+
+  public resume(): void {
+    this.args = this.onResume(this.args, this.resSoFar);
+    this.execInfo.paused = false;
+    ProcessingPriorityQueue.getInstance().resume(this);
   }
 }

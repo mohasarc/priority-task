@@ -141,6 +141,24 @@ export default class ProcessingPriorityQueue {
     }
   }
 
+  public async resume(ptask: PTask<any, any>): Promise<any> {
+    // find the task in the paused queue
+    const pausedItem = this.paused.find((item) => item.task === ptask);
+
+    // if the task is not paused, return null
+    if (!pausedItem) return null;
+
+    // remove the task from the paused queue
+    this.paused = this.paused.filter((item) => item !== pausedItem);
+
+    // add the task to the priority queue
+    this.priorityQueue.add(pausedItem);
+
+    // resume the task
+    pausedItem.paused = false;
+    setImmediate(() => this.process())
+  }
+
   private async process(): Promise<void> {
     if (this.concurrencyCount > 0 && this.priorityQueue.size > 0) {
       this.concurrencyCount--;

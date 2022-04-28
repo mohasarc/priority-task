@@ -174,4 +174,43 @@ describe("PriorityTask", () => {
     task2.run();
     task1.pause();
   });
+
+  it('should be able to resume paused task', (done) => {
+    const calculateSquares = async (nums: number[], execInfo: ExecInfo) => {
+      const squares = [];
+      const iter = async (i: number, num: number) => {
+        if (i === nums.length) return;
+
+        squares.push(num * num);
+        await new Promise(r => setTimeout(r, 20));
+        if (!execInfo.paused) await iter(++i, nums[i]);
+      };
+
+      await iter(0, nums[0]);
+      return squares;
+    };
+
+    const task = new PTask<number[], number[]>({
+      args: [1, 2, 3, 4, 5, 6],
+      priority: 100,
+      onRun: calculateSquares,
+      onPause: (args, resSoFar) => {
+        return args.slice(resSoFar.length);
+      },
+      resultsMerge: (resSoFar, newRes) => {
+        if (!resSoFar) return newRes;
+        return resSoFar.concat(newRes);
+      }
+    });
+
+    task.run().then((res) => {
+      expect(res).toEqual([1, 4, 9, 16, 25, 36]);
+      done();
+    });
+    
+    setTimeout(async () => {
+      await task.pause();
+      task.resume();
+    }, 600);
+  });
 });
