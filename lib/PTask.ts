@@ -18,7 +18,8 @@ interface PTaskOptions<T, R> {
 }
 
 export interface ExecInfo {
-  paused: boolean;
+  isPaused: () => boolean;
+  isCanceled: () => boolean;
 }
 
 export class PTask<T, R> {
@@ -44,8 +45,13 @@ export class PTask<T, R> {
 
   resultsMerge?: (resSoFar: R | null, newResult: R) => R;
 
-  execInfo = {
-    paused: false,
+  paused = false;
+
+  canceled = false;
+
+  execInfo: ExecInfo = {
+    isPaused : () => this.paused,
+    isCanceled : () => this.canceled
   };
 
   constructor(options: PTaskOptions<T, R>) {
@@ -65,7 +71,7 @@ export class PTask<T, R> {
   }
 
   public async pause(): Promise<void> {
-    this.execInfo.paused = true;
+    this.paused = true;
     const newRes = await ProcessingPriorityQueue.getInstance().pause(this);
     this.resSoFar = this.resultsMerge(this.resSoFar, newRes);
     this.args = this.onPause(this.args, this.resSoFar);
@@ -73,7 +79,13 @@ export class PTask<T, R> {
 
   public resume(): void {
     this.args = this.onResume(this.args, this.resSoFar);
-    this.execInfo.paused = false;
+    this.paused = false;
     ProcessingPriorityQueue.getInstance().resume(this);
+  }
+
+  public cancel(abort: boolean): void {
+    this.canceled = true;
+    ProcessingPriorityQueue.getInstance().cancel(this, abort);
+    this.onCancel();
   }
 }

@@ -96,13 +96,36 @@ export default class ProcessingPriorityQueue {
     }
   }
 
-  public cancel(key: number): void {
-    const comparisonFunction = <P>(item: SubscribableQueueItem) =>
-      item.task.key === key;
-    const queueItemTemp = this.priorityQueue.removeOne(comparisonFunction);
+  public async cancel(ptask: PTask<any, any>, abort: boolean): Promise<void> {
+    const item = this.priorityQueue.removeOne((item) => item.task === ptask);
 
-    if (queueItemTemp) {
-      this.existingRequestsMap.set(key, false);
+    if (item) {
+      this.existingRequestsMap.set(item.task.key, false);
+      item.rejectCallback(new Error('Task canceled'));
+    }
+
+    if (abort) {
+      // get the item and remove it from currently running
+      const currentlyRunningItem = this.currentlyRunning.find(
+        (item) => item.task === ptask
+      );
+
+      if (currentlyRunningItem) {
+        this.currentlyRunning.splice(
+          this.currentlyRunning.indexOf(currentlyRunningItem),
+          1
+        );
+        currentlyRunningItem.rejectCallback(new Error('Running task aborted'));
+        return;
+      } 
+      
+      // check if task is paused
+      const pausedItem = this.paused.find((item) => item.task === ptask);
+
+      if (pausedItem) {
+        this.paused.splice(this.paused.indexOf(pausedItem), 1);
+        pausedItem.rejectCallback(new Error('Paused task aborted'));
+      }
     }
   }
 
@@ -122,9 +145,8 @@ export default class ProcessingPriorityQueue {
     );
 
     if (currentlyRunningItem) {
-      currentlyRunningItem.paused = true;
       this.paused.push(currentlyRunningItem);
-      return currentlyRunningItem.createPromise('immediate');
+      return currentlyRunningItem.createPromise("immediate");
     }
 
     /**
@@ -135,7 +157,6 @@ export default class ProcessingPriorityQueue {
     );
 
     if (queueItem) {
-      queueItem.paused = true;
       this.paused.push(queueItem);
       return null;
     }
@@ -155,8 +176,7 @@ export default class ProcessingPriorityQueue {
     this.priorityQueue.add(pausedItem);
 
     // resume the task
-    pausedItem.paused = false;
-    setImmediate(() => this.process())
+    setImmediate(() => this.process());
   }
 
   private async process(): Promise<void> {

@@ -98,7 +98,7 @@ describe("PriorityTask", () => {
 
         squares.push(num * num);
         await new Promise(r => setTimeout(r, 1000));
-        if (!execInfo.paused) await iter(++i, nums[i]);
+        if (!execInfo.isPaused()) await iter(++i, nums[i]);
       };
 
       await iter(0, nums[0]);
@@ -159,7 +159,7 @@ describe("PriorityTask", () => {
 
         squares.push(num * num);
         await new Promise(r => setTimeout(r, 1000));
-        if (!execInfo.paused) await iter(++i, nums[i]);
+        if (!execInfo.isPaused()) await iter(++i, nums[i]);
       };
 
       await iter(0, nums[0]);
@@ -198,7 +198,7 @@ describe("PriorityTask", () => {
 
         squares.push(num * num);
         await new Promise(r => setTimeout(r, 20));
-        if (!execInfo.paused) await iter(++i, nums[i]);
+        if (!execInfo.isPaused()) await iter(++i, nums[i]);
       };
 
       await iter(0, nums[0]);
@@ -229,4 +229,70 @@ describe("PriorityTask", () => {
       task.resume();
     }, 20);
   });
+
+  it('should be able to cancel the task and throw "Task canceled" error', (done) => {
+    const task = new PTask<void, void>({
+      args: null,
+      priority: 1,
+      onRun: async () => await new Promise((resolve) => setTimeout(resolve, 500))
+    });
+    
+    task.run().catch((err) => {
+      expect(err.message).toBe('Task canceled');
+      done();
+    });
+
+    task.cancel(true);
+  });
+
+  it('should be able to abort a running task and throw "Running task aborted" error', (done) => {
+    const task = new PTask<void, void>({
+      args: null,
+      priority: 1,
+      onRun: async () => await new Promise((resolve) => setTimeout(resolve, 500))
+    });
+    
+    task.run().catch((err) => {
+      expect(err.message).toBe('Running task aborted');
+      done();
+    });
+
+    setTimeout(() => {
+      task.cancel(true);
+    }, 200);
+  });
+
+  it('should be able to cancel a paused task and throw "Paused task aborted" error', (done) => {
+    const task = new PTask<void, void>({
+      args: null,
+      priority: 1,
+      onRun: async () => await new Promise((resolve) => setTimeout(resolve, 500))
+    });
+    
+    task.run().catch((err) => {
+      expect(err.message).toBe('Paused task aborted');
+      done();
+    });
+
+    task.pause();
+    task.cancel(true);
+  });
+
+  it('should resolve all the waiting promises after calling run multiple times for the same task', (done) =>{
+    const ptask = new PTask<void, void>({
+      args: null,
+      priority: 1,
+      onRun: async () => await new Promise((resolve) => setTimeout(resolve, 500))
+    });
+
+    const res = [];
+    const p1 = ptask.run().then(() => res.push(1));
+    const p2 = ptask.run().then(() => res.push(2));
+    const p3 = ptask.run().then(() => res.push(3));
+
+    Promise.all([p1, p2, p3]).then((res) => {
+      expect(res).toEqual([1, 2, 3]);
+      done();
+    });
+  })
 });
