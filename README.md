@@ -1,21 +1,21 @@
-# ptask.js
+# priority-task
 
 Helps running tasks based on priority without having to deal with a priority queue. additionally, provides a utility to pause, resume and abort task execution.
 
-Using `ptask.js` you need to only create the tasks, assign them priority, and run them. `ptask.js` will take care of running them in order.
+Using `priority-task` you need to only create the tasks, assign them priority, and run them. `priority-task` will take care of running them in order.
 
 ## Installing the package
 
 ### using npm
 
 ```js
-npm i ptaskjs
+npm i priority-task
 ```
 
 ### using yarn
 
 ```js
-yarn add ptaskjs
+yarn add priority-task
 ```
 
 ## Usage
@@ -25,7 +25,7 @@ yarn add ptaskjs
 You need to only create `PTask` objects; assign them a priority, a function to run, and a value to pass to the function; then call `PTask.run()` method. `PTask.run()` method returns a promise which will resolve to the output of the function passed to `onRun` option.
 
 ```js
-import { PTask } from "ptaskjs";
+import { PTask } from "priority-task";
 
 // Prepare tasks
 const task1 = new PTask<number, number>({

@@ -1,5 +1,5 @@
 {
-  "name": "ptaskjs",
+  "name": "priority-task",
   "version": "0.0.1",
   "description": "Priority based task runner. ",
   "main": "./dist/index.js",
