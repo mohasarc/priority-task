@@ -230,7 +230,7 @@ describe("PriorityTask", () => {
     }, 20);
   });
 
-  it('should be able to cancel the task and throw "Task canceled" error', (done) => {
+  it('should be able to cancel the task and throw "Task canceled" error with abort option', (done) => {
     const task = new PTask<void, void>({
       args: null,
       priority: 1,
@@ -245,11 +245,35 @@ describe("PriorityTask", () => {
     task.cancel(true);
   });
 
-  it('should be able to abort a running task and throw "Running task aborted" error', (done) => {
+  it('should be able to cancel the task and throw "Task canceled" error without abort option', (done) => {
     const task = new PTask<void, void>({
       args: null,
       priority: 1,
       onRun: async () => await new Promise((resolve) => setTimeout(resolve, 500))
+    });
+    
+    task.run().catch((err) => {
+      expect(err.message).toBe('Task canceled');
+      done();
+    });
+
+    task.cancel();
+  });
+
+  it('should be able to abort a running task and throw "Running task aborted" error', (done) => {
+    const task = new PTask<void, void>({
+      args: null,
+      priority: 1,
+      onRun: async (args, execInfo) => {
+        const iter = async () => {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          if (!execInfo.isCanceled()) {
+            await iter();
+          }
+        }
+  
+        await iter();
+      },
     });
     
     task.run().catch((err) => {
@@ -330,9 +354,162 @@ describe("PriorityTask", () => {
     });
   });
 
-  // TODO use function for priority
+  it('should accept a function for priority', (done) => {
+    // Prepare tasks
+    const task1 = new PTask<number, number>({
+      priority: () => 1,
+      args: 1,
+      onRun: async (a: number) => a,
+    });
 
-  // TODO use callback for cancel
+    const task2 = new PTask<number, number>({
+      priority: () => 2,
+      args: 2,
+      onRun: async (a: number) => a,
+    });
+
+    const task3 = new PTask<number, number>({
+      priority: () => 3,
+      args: 3,
+      onRun: async (a: number) => a,
+    });
+
+    const res = [];
+    const p2 = task2.run().then((val) => res.push(val));
+    const p1 = task1.run().then((val) => res.push(val));
+    const p3 = task3.run().then((val) => res.push(val));
+
+    Promise.all([p1, p2, p3]).then(() => {
+      expect(res).toEqual([3, 2, 1]);
+      done();
+    });
+  });
+
+  it('should run onCancel callback after a task is canceled', (done) => {
+    const task = new PTask<void, void>({
+      args: null,
+      priority: 1,
+      onRun: async () => await new Promise((resolve) => setTimeout(resolve, 500)),
+      onCancel: () => {
+        expect(true).toBe(true);
+        done();
+      }
+    });
+    
+    task.run().catch((err) => null);
+    task.cancel(true);
+  });
 
   // TODO pause multiple times
+  it('should not call onPause multiple times if pause was executed multiple times', async () => {
+    let pauseCallCount = 0;
+    const task = new PTask<void, void>({
+      args: null,
+      priority: 1,
+      onRun: async () => await new Promise((resolve) => setTimeout(resolve, 500)),
+      onPause: () => {pauseCallCount++},
+    });
+
+    task.run();
+    await task.pause();
+    await task.pause();
+    await task.pause();
+    expect(pauseCallCount).toBe(1);
+  });
+
+  it('should allow accessing isCanceled in onRun', (done) => {
+    let p1RunCount = 0;
+    let p2RunCount = 0;
+
+    const ptask1 = new PTask<void, void>({
+      args: null,
+      priority: 1,
+      onRun: async (args, execInfo) => {
+        const iter = async () => {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          if (!execInfo.isCanceled()) {
+            p1RunCount++;
+            await iter();
+          }
+        }
+  
+        await iter();
+      },
+    });
+
+    const ptask2 = new PTask<void, void>({
+      args: null,
+      priority: 1,
+      onRun: async (args, execInfo) => {
+        const iter = async () => {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          if (!execInfo.isCanceled()) {
+            p2RunCount++;
+            await iter();
+          }
+        }
+  
+        await iter();
+      },
+    });
+    
+    ptask1.run().catch((err) => null);
+    ptask2.run().catch((err) => null);
+    setTimeout(() => {
+      ptask1.cancel(true);
+    }, 1000);
+
+    setTimeout(() => {
+      Promise.all([
+        expect(p1RunCount).toBeLessThan(10),
+        expect(p2RunCount).toBeGreaterThan(10),
+      ]).then(() => {
+        ptask2.cancel(true); // so that the test worker can exit
+        done()
+      });
+    }, 3000);
+  });
+
+  it('should throw an error when trying to pause a task that is not running', (done) => {
+    const ptask = new PTask<void, void>({
+      args: null,
+      priority: 1,
+      onRun: async () => await new Promise((resolve) => setTimeout(resolve, 500)),
+    });
+
+    ptask.pause().catch((err) => {
+      expect(err.message).toBe('Cannot pause a task that is not running');
+      done();
+    });
+  });
+
+  it('should throw an error when trying to cancel a task that is not running with abort option', (done) => {
+    const ptask = new PTask<void, void>({
+      args: null,
+      priority: 1,
+      onRun: async () => await new Promise((resolve) => setTimeout(resolve, 500)),
+    });
+
+    ptask.cancel(true).then((result) => {
+      Promise.all([
+        expect(result[0]).toBe(false),
+        expect(result[1]).toBe('Task not found'),
+      ]).finally(() => done());
+    });
+  });
+
+  it('should throw an error when trying to cancel a task that is not running without abort option', (done) => {
+    const ptask = new PTask<void, void>({
+      args: null,
+      priority: 1,
+      onRun: async () => await new Promise((resolve) => setTimeout(resolve, 500)),
+    });
+
+    ptask.cancel().then((result) => {
+      Promise.all([
+        expect(result[0]).toBe(false),
+        expect(result[1]).toBe('Task not found'),
+      ]).finally(() => done());
+    });
+  });
 });

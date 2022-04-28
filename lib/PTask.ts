@@ -71,6 +71,8 @@ export class PTask<T, R> {
   }
 
   public async pause(): Promise<void> {
+    if (this.paused) return;
+
     this.paused = true;
     const newRes = await ProcessingPriorityQueue.getInstance().pause(this);
     this.resSoFar = this.resultsMerge(this.resSoFar, newRes);
@@ -78,15 +80,42 @@ export class PTask<T, R> {
   }
 
   public resume(): void {
+    if (!this.paused) return;
+  
     this.args = this.onResume(this.args, this.resSoFar);
     this.paused = false;
     ProcessingPriorityQueue.getInstance().resume(this);
   }
 
-  public cancel(abort: boolean): void {
+  public async cancel(abort: boolean = false): Promise<[boolean, string]> {
+    if (this.canceled) return [true, 'Already canceled'];
+
     this.canceled = true;
-    ProcessingPriorityQueue.getInstance().cancel(this, abort);
-    this.onCancel();
+    let result = true;
+    let message = 'Successfully canceled';
+
+    if (abort) {
+      try {
+        await ProcessingPriorityQueue.getInstance().cancel(this);
+      } catch (err) {
+        try {
+          await ProcessingPriorityQueue.getInstance().abort(this);
+        } catch {
+          result = false;
+          message = `${err.message}`;
+        }
+      }
+    } else {
+      try {
+        await ProcessingPriorityQueue.getInstance().cancel(this);
+      } catch (err) {
+        result = false;
+        message = `${err.message}`;
+      }
+    }
+  
+    if (result) this.onCancel();
+    return [result, message];
   }
 
   public setPriority(p: number | (() => number)){

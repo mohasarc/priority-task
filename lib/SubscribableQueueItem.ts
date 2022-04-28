@@ -19,16 +19,14 @@ export default class SubscribableQueueItem {
 
   constructor(public task: PTask<any, any>) {}
 
-  public resolveCallback(result: any) {
-    let listenerType = this.task.paused && !this.task.canceled ? "immediate" : "eventual";
-    this.resolveCallbacks[listenerType].forEach((resolveCB: Function) => {
+  public resolveCallback(result: any, type: ListenerType) {
+    this.resolveCallbacks[type].forEach((resolveCB: Function) => {
       resolveCB(result);
     });
   }
 
-  public rejectCallback(error: any) {
-    let listenerType = this.task.paused && !this.task.canceled ? "immediate" : "eventual";
-    this.rejectCallbacks[listenerType].forEach((rejectCB: Function) => {
+  public rejectCallback(error: any, type: ListenerType) {
+    this.rejectCallbacks[type].forEach((rejectCB: Function) => {
       rejectCB(error);
     });
   }

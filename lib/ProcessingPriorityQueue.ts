@@ -92,47 +92,45 @@ export default class ProcessingPriorityQueue {
     if (queueItemTemp) this.priorityQueue.add(queueItemTemp);
   }
 
-  public async cancel(ptask: PTask<any, any>, abort: boolean): Promise<void> {
+  public async cancel(ptask: PTask<any, any>): Promise<boolean> {
     const item = this.priorityQueue.removeOne((item) => item.task === ptask);
+    if (!item) throw new Error('Task not found');
 
-    if (item) {
-      this.existingRequestsMap.set(item.task.key, false);
-      item.rejectCallback(new Error('Task canceled'));
-    }
+    this.existingRequestsMap.set(item.task.key, false);
+    item.rejectCallback(new Error('Task canceled'), 'eventual');
+    return true;
+  }
 
-    if (abort) {
-      // get the item and remove it from currently running
-      const currentlyRunningItem = this.currentlyRunning.find(
-        (item) => item.task === ptask
-      );
+  public async abort(ptask: PTask<any, any>): Promise<any> {
+    // get the item and remove it from currently running
+    const currentlyRunningItem = this.currentlyRunning.find(item => item.task === ptask);
+    if (currentlyRunningItem) return this.abortRunning(currentlyRunningItem);
+    
+    // check if task is paused
+    const pausedItem = this.paused.find(item => item.task === ptask);
+    if (pausedItem) return this.abortPaused(pausedItem);
 
-      if (currentlyRunningItem) {
-        this.currentlyRunning.splice(
-          this.currentlyRunning.indexOf(currentlyRunningItem),
-          1
-        );
-        currentlyRunningItem.rejectCallback(new Error('Running task aborted'));
-        return;
-      } 
-      
-      // check if task is paused
-      const pausedItem = this.paused.find((item) => item.task === ptask);
+    throw new Error("Cannot abort a task that is not running");
+  }
 
-      if (pausedItem) {
-        this.paused.splice(this.paused.indexOf(pausedItem), 1);
-        pausedItem.rejectCallback(new Error('Paused task aborted'));
-      }
+  private async abortPaused(queueItem: SubscribableQueueItem): Promise<any> {
+    this.paused.splice(this.paused.indexOf(queueItem), 1);
+    queueItem.rejectCallback(new Error('Paused task aborted'), 'eventual');
+
+    return true;
+  }
+
+  private async abortRunning(queueItem: SubscribableQueueItem): Promise<any> {
+    this.currentlyRunning.splice(this.currentlyRunning.indexOf(queueItem), 1);
+    try {
+      await queueItem.createPromise('immediate');
+    } catch {}
+    finally {
+      queueItem.rejectCallback(new Error('Running task aborted'), 'eventual');
     }
   }
 
   public async pause(ptask: PTask<any, any>): Promise<any> {
-    /**
-     * Check if the task was already paused
-     */
-    if (this.paused.find((item) => item.task === ptask)) {
-      return null;
-    }
-
     /**
      * Check if the task is currently running
      */
@@ -156,6 +154,8 @@ export default class ProcessingPriorityQueue {
       this.paused.push(queueItem);
       return null;
     }
+
+    throw new Error("Cannot pause a task that is not running");
   }
 
   public async resume(ptask: PTask<any, any>): Promise<any> {
@@ -185,10 +185,10 @@ export default class ProcessingPriorityQueue {
       item.task
         .onRun(item.task.args, item.task.execInfo)
         .then((result) => {
-          item.resolveCallback(result);
+          item.resolveCallback(result, item.task.execInfo.isCanceled() || item.task.execInfo.isPaused() ? 'immediate' : 'eventual');
         })
         .catch((error) => {
-          item.rejectCallback(error);
+          item.rejectCallback(error, item.task.execInfo.isCanceled() || item.task.execInfo.isPaused() ? 'immediate' : 'eventual');
         })
         .finally(async () => {
           // remove from currently running
