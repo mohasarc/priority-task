@@ -2,6 +2,8 @@
 
 Helps running tasks based on priority without having to deal with a priority queue. additionally, provides a utility to pause, resume and abort task execution.
 
+[![Tests](https://github.com/mohasarc/priority-task/actions/workflows/run-tests.yml/badge.svg)](https://github.com/mohasarc/priority-task/actions/workflows/run-tests.yml)
+![Coveralls](https://img.shields.io/coveralls/github/mohasarc/priority-task)
 Using `priority-task` you need to only create the tasks, assign them priority, and run them. `priority-task` will take care of running them in order.
 
 ## Installing the package
