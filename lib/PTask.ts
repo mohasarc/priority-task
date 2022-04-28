@@ -87,7 +87,7 @@ export class PTask<T, R> {
     ProcessingPriorityQueue.getInstance().resume(this);
   }
 
-  public async cancel(abort: boolean = false): Promise<[boolean, string]> {
+  public async cancel({abort}: {abort: boolean} = {abort: false}): Promise<[boolean, string]> {
     if (this.canceled) return [true, 'Already canceled'];
 
     this.canceled = true;

@@ -242,7 +242,7 @@ describe("PriorityTask", () => {
       done();
     });
 
-    task.cancel(true);
+    task.cancel({abort: true});
   });
 
   it('should be able to cancel the task and throw "Task canceled" error without abort option', (done) => {
@@ -282,7 +282,7 @@ describe("PriorityTask", () => {
     });
 
     setTimeout(() => {
-      task.cancel(true);
+      task.cancel({abort: true});
     }, 200);
   });
 
@@ -299,7 +299,7 @@ describe("PriorityTask", () => {
     });
 
     task.pause();
-    task.cancel(true);
+    task.cancel({abort: true});
   });
 
   it('should resolve all the waiting promises after calling run multiple times for the same task', (done) =>{
@@ -397,7 +397,7 @@ describe("PriorityTask", () => {
     });
     
     task.run().catch((err) => null);
-    task.cancel(true);
+    task.cancel({abort: true});
   });
 
   // TODO pause multiple times
@@ -423,7 +423,7 @@ describe("PriorityTask", () => {
 
     const ptask1 = new PTask<void, void>({
       args: null,
-      priority: 1,
+      priority: 2,
       onRun: async (args, execInfo) => {
         const iter = async () => {
           await new Promise((resolve) => setTimeout(resolve, 100));
@@ -456,7 +456,7 @@ describe("PriorityTask", () => {
     ptask1.run().catch((err) => null);
     ptask2.run().catch((err) => null);
     setTimeout(() => {
-      ptask1.cancel(true);
+      ptask1.cancel({abort: true});
     }, 1000);
 
     setTimeout(() => {
@@ -464,7 +464,7 @@ describe("PriorityTask", () => {
         expect(p1RunCount).toBeLessThan(10),
         expect(p2RunCount).toBeGreaterThan(10),
       ]).then(() => {
-        ptask2.cancel(true); // so that the test worker can exit
+        ptask2.cancel({abort: true}); // so that the test worker can exit
         done()
       });
     }, 3000);
@@ -490,7 +490,7 @@ describe("PriorityTask", () => {
       onRun: async () => await new Promise((resolve) => setTimeout(resolve, 500)),
     });
 
-    ptask.cancel(true).then((result) => {
+    ptask.cancel({abort: true}).then((result) => {
       Promise.all([
         expect(result[0]).toBe(false),
         expect(result[1]).toBe('Task not found'),
