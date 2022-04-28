@@ -24,6 +24,21 @@ describe("PriorityTask", () => {
     });
   });
 
+  it('should through the same error the task throws', (done) => {
+    const task = new PTask<void, void>({
+      args: null,
+      priority: 1,
+      onRun: async () => {
+        throw new Error('test error');
+      },
+    });
+
+    task.run().catch((err) => {
+      expect(err.message).toBe('test error');
+      done();
+    });
+  });
+
   it("should run the tasks in order of priority", () => {
     // Prepare tasks
     const task1 = new PTask<number, number>({
@@ -195,6 +210,7 @@ describe("PriorityTask", () => {
       priority: 100,
       onRun: calculateSquares,
       onPause: (args, resSoFar) => {
+        if (!resSoFar) return args;
         return args.slice(resSoFar.length);
       },
       resultsMerge: (resSoFar, newRes) => {
@@ -211,6 +227,6 @@ describe("PriorityTask", () => {
     setTimeout(async () => {
       await task.pause();
       task.resume();
-    }, 600);
+    }, 20);
   });
 });
