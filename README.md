@@ -70,7 +70,8 @@ const calculateSquares = async (nums: number[], execInfo: ExecInfo) => {
 
     squares.push(num * num);
     await new Promise(r => setTimeout(r, 20));
-    // Checking if the task was paused. If paused will stop execution and return the results obtained so far.
+    // Checking if the task was paused. If paused will stop execution
+    // and return the results obtained so far.
     if (!execInfo.isPaused()) await iter(++i, nums[i]);
     };
 
