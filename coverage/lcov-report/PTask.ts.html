@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">96.61% </span>
+                <span class="strong">96.66% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>57/59</span>
+                <span class='fraction'>58/60</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">88.23% </span>
+                <span class="strong">89.47% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>15/17</span>
+                <span class='fraction'>17/19</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>52/52</span>
+                <span class='fraction'>53/53</span>
             </div>
         
             
@@ -204,7 +204,12 @@
 <a name='L139'></a><a href='#L139'>139</a>
 <a name='L140'></a><a href='#L140'>140</a>
 <a name='L141'></a><a href='#L141'>141</a>
-<a name='L142'></a><a href='#L142'>142</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -232,6 +237,8 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -261,6 +268,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-yes">31x</span>
@@ -362,6 +370,7 @@ interface PTaskOptions&lt;T, R&gt; {
   onResume?: (args: T, resSoFar: R | null) =&gt; T;
   onCancel?: () =&gt; void;
   resultsMerge?: (resSoFar: R | null, newResult: R) =&gt; R;
+  queueName?: string;
 }
 &nbsp;
 export interface ExecInfo {
@@ -388,12 +397,14 @@ export class PTask&lt;T, R&gt; {
   
   private resultsMerge?: (resSoFar: R | null, newResult: R) =&gt; R;
   
+  private queueName: string;
+  
   private _args: any;
   
   private resSoFar: R | null = null;
   
   private paused = false;
-&nbsp;
+  
   private canceled = false;
 &nbsp;
   execInfo: ExecInfo = {
@@ -410,10 +421,11 @@ export class PTask&lt;T, R&gt; {
     this.onResume = options.onResume || ((arg: T) =&gt; arg);
     this.onCancel = options.onCancel || (() =&gt; {});
     this.resultsMerge = options.resultsMerge || ((resSoFar: R | null, newResult: R) =&gt; newResult);
+    this.queueName = options.queueName || 'default';
   }
 &nbsp;
   public async run(): Promise&lt;R&gt; {
-    const newRes = await ProcessingPriorityQueue.getInstance().enqueue(this);
+    const newRes = await ProcessingPriorityQueue.getInstance(this.queueName).enqueue(this);
     return this.resultsMerge(this.resSoFar, newRes);
   }
 &nbsp;
@@ -421,7 +433,7 @@ export class PTask&lt;T, R&gt; {
     if (this.paused) return;
 &nbsp;
     this.paused = true;
-    const newRes = await ProcessingPriorityQueue.getInstance().pause(this);
+    const newRes = await ProcessingPriorityQueue.getInstance(this.queueName).pause(this);
     this.resSoFar = this.resultsMerge(this.resSoFar, newRes);
     this._args = this.onPause(this.args, this.resSoFar);
   }
@@ -431,7 +443,7 @@ export class PTask&lt;T, R&gt; {
   
     this._args = this.onResume(this.args, this.resSoFar);
     this.paused = false;
-    ProcessingPriorityQueue.getInstance().resume(this);
+    ProcessingPriorityQueue.getInstance(this.queueName).resume(this);
   }
 &nbsp;
   public async cancel({abort}: {abort: boolean} = {abort: false}): Promise&lt;[boolean, string]&gt; {
@@ -443,10 +455,10 @@ export class PTask&lt;T, R&gt; {
 &nbsp;
     if (abort) {
       try {
-        await ProcessingPriorityQueue.getInstance().cancel(this);
+        await ProcessingPriorityQueue.getInstance(this.queueName).cancel(this);
       } catch (err) {
         try {
-          await ProcessingPriorityQueue.getInstance().abort(this);
+          await ProcessingPriorityQueue.getInstance(this.queueName).abort(this);
         } catch {
           result = false;
           message = `${err.message}`;
@@ -454,7 +466,7 @@ export class PTask&lt;T, R&gt; {
       }
     } else {
       try {
-        await ProcessingPriorityQueue.getInstance().cancel(this);
+        await ProcessingPriorityQueue.getInstance(this.queueName).cancel(this);
       } catch (err) {
         result = false;
         message = `${err.message}`;
@@ -467,7 +479,7 @@ export class PTask&lt;T, R&gt; {
 &nbsp;
   public set priority(p: number | (() =&gt; number)){
     this._priority = p;
-    ProcessingPriorityQueue.getInstance().updatePriority(this);
+    ProcessingPriorityQueue.getInstance(this.queueName).updatePriority(this);
   }
 &nbsp;
   public get priority(): number | (() =&gt; number) {
@@ -493,7 +505,7 @@ export class PTask&lt;T, R&gt; {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at Fri Apr 29 2022 13:49:39 GMT+0300 (GMT+03:00)
+                at Fri Apr 29 2022 14:06:46 GMT+0300 (GMT+03:00)
             </div>
         <script src="prettify.js"></script>
         <script>

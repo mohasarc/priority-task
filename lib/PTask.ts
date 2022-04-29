@@ -15,6 +15,7 @@ interface PTaskOptions<T, R> {
   onResume?: (args: T, resSoFar: R | null) => T;
   onCancel?: () => void;
   resultsMerge?: (resSoFar: R | null, newResult: R) => R;
+  queueName?: string;
 }
 
 export interface ExecInfo {
@@ -41,12 +42,14 @@ export class PTask<T, R> {
   
   private resultsMerge?: (resSoFar: R | null, newResult: R) => R;
   
+  private queueName: string;
+  
   private _args: any;
   
   private resSoFar: R | null = null;
   
   private paused = false;
-
+  
   private canceled = false;
 
   execInfo: ExecInfo = {
@@ -63,10 +66,11 @@ export class PTask<T, R> {
     this.onResume = options.onResume || ((arg: T) => arg);
     this.onCancel = options.onCancel || (() => {});
     this.resultsMerge = options.resultsMerge || ((resSoFar: R | null, newResult: R) => newResult);
+    this.queueName = options.queueName || 'default';
   }
 
   public async run(): Promise<R> {
-    const newRes = await ProcessingPriorityQueue.getInstance().enqueue(this);
+    const newRes = await ProcessingPriorityQueue.getInstance(this.queueName).enqueue(this);
     return this.resultsMerge(this.resSoFar, newRes);
   }
 
@@ -74,7 +78,7 @@ export class PTask<T, R> {
     if (this.paused) return;
 
     this.paused = true;
-    const newRes = await ProcessingPriorityQueue.getInstance().pause(this);
+    const newRes = await ProcessingPriorityQueue.getInstance(this.queueName).pause(this);
     this.resSoFar = this.resultsMerge(this.resSoFar, newRes);
     this._args = this.onPause(this.args, this.resSoFar);
   }
@@ -84,7 +88,7 @@ export class PTask<T, R> {
   
     this._args = this.onResume(this.args, this.resSoFar);
     this.paused = false;
-    ProcessingPriorityQueue.getInstance().resume(this);
+    ProcessingPriorityQueue.getInstance(this.queueName).resume(this);
   }
 
   public async cancel({abort}: {abort: boolean} = {abort: false}): Promise<[boolean, string]> {
@@ -96,10 +100,10 @@ export class PTask<T, R> {
 
     if (abort) {
       try {
-        await ProcessingPriorityQueue.getInstance().cancel(this);
+        await ProcessingPriorityQueue.getInstance(this.queueName).cancel(this);
       } catch (err) {
         try {
-          await ProcessingPriorityQueue.getInstance().abort(this);
+          await ProcessingPriorityQueue.getInstance(this.queueName).abort(this);
         } catch {
           result = false;
           message = `${err.message}`;
@@ -107,7 +111,7 @@ export class PTask<T, R> {
       }
     } else {
       try {
-        await ProcessingPriorityQueue.getInstance().cancel(this);
+        await ProcessingPriorityQueue.getInstance(this.queueName).cancel(this);
       } catch (err) {
         result = false;
         message = `${err.message}`;
@@ -120,7 +124,7 @@ export class PTask<T, R> {
 
   public set priority(p: number | (() => number)){
     this._priority = p;
-    ProcessingPriorityQueue.getInstance().updatePriority(this);
+    ProcessingPriorityQueue.getInstance(this.queueName).updatePriority(this);
   }
 
   public get priority(): number | (() => number) {

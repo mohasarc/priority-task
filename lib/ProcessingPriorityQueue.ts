@@ -9,7 +9,7 @@ export default class ProcessingPriorityQueue {
   /**
    * TODO add comments
    */
-  private static instance = new ProcessingPriorityQueue();
+  private static instances = new Map<string, ProcessingPriorityQueue>();
 
   /**
    * TODO add comments
@@ -202,7 +202,11 @@ export default class ProcessingPriorityQueue {
     }
   }
 
-  static getInstance(): ProcessingPriorityQueue {
-    return this.instance;
+  static getInstance(queueName: string): ProcessingPriorityQueue {
+    if (!ProcessingPriorityQueue.instances.has(queueName)) {
+      ProcessingPriorityQueue.instances.set(queueName, new ProcessingPriorityQueue(1));
+    }
+
+    return ProcessingPriorityQueue.instances.get(queueName);
   }
 }
