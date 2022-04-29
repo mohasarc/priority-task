@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1651156081650" clover="3.2.0">
-  <project timestamp="1651156081650" name="All files">
-    <metrics statements="50" coveredstatements="50" conditionals="17" coveredconditionals="15" methods="13" coveredmethods="13" elements="80" coveredelements="78" complexity="0" loc="50" ncloc="50" packages="1" files="2" classes="2"/>
-    <file name="PTask.ts" path="D:\Projects\PriorityTaskJS\lib\PTask.ts">
-      <metrics statements="48" coveredstatements="48" conditionals="17" coveredconditionals="15" methods="12" coveredmethods="12"/>
+<coverage generated="1651229379612" clover="3.2.0">
+  <project timestamp="1651229379613" name="All files">
+    <metrics statements="54" coveredstatements="54" conditionals="17" coveredconditionals="15" methods="17" coveredmethods="17" elements="88" coveredelements="86" complexity="0" loc="54" ncloc="54" packages="1" files="2" classes="2"/>
+    <file name="PTask.ts" path="D:\Projects\priority-task\lib\PTask.ts">
+      <metrics statements="52" coveredstatements="52" conditionals="17" coveredconditionals="15" methods="16" coveredmethods="16"/>
       <line num="1" count="1" type="stmt"/>
       <line num="25" count="1" type="stmt"/>
       <line num="26" count="1" type="stmt"/>
       <line num="28" count="31" type="stmt"/>
-      <line num="36" count="31" type="stmt"/>
+      <line num="46" count="31" type="stmt"/>
       <line num="48" count="31" type="stmt"/>
       <line num="50" count="31" type="stmt"/>
       <line num="52" count="31" type="stmt"/>
@@ -52,8 +52,12 @@
       <line num="118" count="8" type="stmt"/>
       <line num="122" count="2" type="stmt"/>
       <line num="123" count="2" type="stmt"/>
+      <line num="127" count="84" type="stmt"/>
+      <line num="131" count="90" type="stmt"/>
+      <line num="135" count="27" type="stmt"/>
+      <line num="139" count="19" type="stmt"/>
     </file>
-    <file name="index.ts" path="D:\Projects\PriorityTaskJS\lib\index.ts">
+    <file name="index.ts" path="D:\Projects\priority-task\lib\index.ts">
       <metrics statements="2" coveredstatements="2" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
       <line num="1" count="1" type="stmt"/>
       <line num="2" count="33" type="stmt"/>

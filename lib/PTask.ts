@@ -25,29 +25,29 @@ export interface ExecInfo {
 export class PTask<T, R> {
   private static count = 0;
 
-  key: number = PTask.count++;
+  private _key: number = PTask.count++;
 
-  priority: number | (() => number);
+  private _priority: number | (() => number);
 
-  delay: number;
+  private delay: number;
 
-  args: any;
+  private _onRun: (args: T, execInfo?: ExecInfo) => Promise<R>;
 
+  private onPause: (args: T, resSoFar: R | null) => T;
+
+  private onResume: (args: T, resSoFar: R | null) => T;
+  
+  private onCancel: () => void;
+  
+  private resultsMerge?: (resSoFar: R | null, newResult: R) => R;
+  
+  private _args: any;
+  
   private resSoFar: R | null = null;
+  
+  private paused = false;
 
-  onRun: (args: T, execInfo?: ExecInfo) => Promise<R>;
-
-  onPause: (args: T, resSoFar: R | null) => T;
-
-  onResume: (args: T, resSoFar: R | null) => T;
-
-  onCancel: () => void;
-
-  resultsMerge?: (resSoFar: R | null, newResult: R) => R;
-
-  paused = false;
-
-  canceled = false;
+  private canceled = false;
 
   execInfo: ExecInfo = {
     isPaused : () => this.paused,
@@ -55,10 +55,10 @@ export class PTask<T, R> {
   };
 
   constructor(options: PTaskOptions<T, R>) {
-    this.priority = options.priority;
+    this._priority = options.priority;
     this.delay = options.delay || 0;
-    this.args = options.args;
-    this.onRun = options.onRun;
+    this._args = options.args;
+    this._onRun = options.onRun;
     this.onPause = options.onPause || ((arg: T) => arg);
     this.onResume = options.onResume || ((arg: T) => arg);
     this.onCancel = options.onCancel || (() => {});
@@ -76,13 +76,13 @@ export class PTask<T, R> {
     this.paused = true;
     const newRes = await ProcessingPriorityQueue.getInstance().pause(this);
     this.resSoFar = this.resultsMerge(this.resSoFar, newRes);
-    this.args = this.onPause(this.args, this.resSoFar);
+    this._args = this.onPause(this.args, this.resSoFar);
   }
 
   public resume(): void {
     if (!this.paused) return;
   
-    this.args = this.onResume(this.args, this.resSoFar);
+    this._args = this.onResume(this.args, this.resSoFar);
     this.paused = false;
     ProcessingPriorityQueue.getInstance().resume(this);
   }
@@ -118,8 +118,24 @@ export class PTask<T, R> {
     return [result, message];
   }
 
-  public setPriority(p: number | (() => number)){
-    this.priority = p;
+  public set priority(p: number | (() => number)){
+    this._priority = p;
     ProcessingPriorityQueue.getInstance().updatePriority(this);
+  }
+
+  public get priority(): number | (() => number) {
+    return this._priority;
+  }
+
+  public get key(): number {
+    return this._key;
+  }
+
+  public get args(): T {
+    return this._args;
+  }
+
+  public get onRun(): (args: T, execInfo?: ExecInfo) => Promise<R> {
+    return this._onRun;
   }
 }

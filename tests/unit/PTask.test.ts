@@ -345,8 +345,8 @@ describe("PriorityTask", () => {
     const p1 = task1.run().then((val) => res.push(val));
     const p3 = task3.run().then((val) => res.push(val));
 
-    task2.setPriority(6);
-    task1.setPriority(5);
+    task2.priority = 6;
+    task1.priority = 5;
 
     Promise.all([p1, p2, p3]).then(() => {
       expect(res).toEqual([2, 1, 3]);
