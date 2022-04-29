@@ -90,6 +90,32 @@ describe("PriorityTask", () => {
     }, 2000);
   });
 
+  it('should resume the execution of other tasks when one task is paused', (done) => {
+    const runWithDelay = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return 1;
+    };
+
+    const task1 = new PTask<void, number>({
+      args: null,
+      priority: 2,
+      onRun: runWithDelay,
+    });
+
+    const task2 = new PTask<void, number>({
+      args: null,
+      priority: 1,
+      onRun: runWithDelay,
+    });
+
+    task1.run();
+    task2.run().then((res) => {
+      expect(res).toBe(1);
+      done();
+    });
+    task1.pause();
+  });
+
   it("should run onPause when task is paused", (done) => {
     const calculateSquares = async (nums: number[], execInfo: ExecInfo) => {
       const squares = [];

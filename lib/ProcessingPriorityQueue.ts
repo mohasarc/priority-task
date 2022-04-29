@@ -140,7 +140,9 @@ export default class ProcessingPriorityQueue {
 
     if (currentlyRunningItem) {
       this.paused.push(currentlyRunningItem);
-      return currentlyRunningItem.createPromise("immediate");
+      const result = await currentlyRunningItem.createPromise("immediate");
+      this.process();
+      return result;
     }
 
     /**
