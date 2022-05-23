@@ -1,6 +1,6 @@
 {
   "name": "priority-task",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Priority based task runner. ",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
