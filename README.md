@@ -86,10 +86,10 @@ const task = new PTask<number[], number[]>({
     args: [1, 2, 3, 4, 5, 6],
     priority: 1,
     onRun: calculateSquares,
-    // This optional function will be called after the task was paused with the 
-    // currently available arguments and the results obtained so far.
-    // The return of this function will be used as the argument for the
-    // calculateSquares function, when execution is resumed.
+    // This optional function will be called after the task was paused
+    // with the currently available arguments and the results obtained
+    // so far. The return of this function will be used as the argument
+    // for the calculateSquares function, when execution is resumed.
     onPause: (args, resSoFar) => {
         // If no results obtained so far, return the same arguments
         if (!resSoFar) return args;
@@ -100,7 +100,8 @@ const task = new PTask<number[], number[]>({
     },
     // When resuming the execution, calculateSquares will have a subset of
     // the original argument; hence will produce a subset of final result.
-    // This function is used to merge the previously obtained results with the new subset
+    // This function is used to merge the previously obtained results with
+    // the new subset
     resultsMerge: (resSoFar, newRes) => {
     if (!resSoFar) return newRes;
     return resSoFar.concat(newRes);
@@ -193,7 +194,7 @@ setTimeout(() => {
     console.log(p1RunCount < 10); // true
     console.log(p2RunCount > 10); // true
 
-    ptask2.cancel({abort: true}); // abort the second task so it doesn't run for ∞
+    ptask2.cancel({abort: true}); // abort the 2nd task so it doesn't run for ∞
 }, 3000);
 ```
 
