@@ -538,4 +538,17 @@ describe("PriorityTask", () => {
       ]).finally(() => done());
     });
   });
+
+  it('should not crash if run is called after pausing', (done) => {
+    const ptask = new PTask<void, void>({
+      args: null,
+      priority: 1,
+      onRun: async () => await new Promise((resolve) => setTimeout(resolve, 500)),
+    });
+
+    ptask.run();
+    ptask.pause();
+    ptask.run().then(() => done());
+    ptask.resume();
+  });
 });

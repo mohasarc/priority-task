@@ -7,27 +7,36 @@ import SubscribableQueueItem from "./SubscribableQueueItem";
  */
 export default class ProcessingPriorityQueue {
   /**
-   * TODO add comments
+   * A map of all the instances of the queue.
    */
   private static instances = new Map<string, ProcessingPriorityQueue>();
 
   /**
-   * TODO add comments
+   * This map is used to keep track of the tasks waiting for execution.
    */
-  private existingRequestsMap: Map<number, boolean>;
+  private existingRequestsMap = new Map<number, boolean>();
 
   /**
-   * TODO add comments
+   * This map is used to keep track of the paused tasks.
+   */
+  private isPaused = new Map<number, boolean>();
+
+  /**
+   * Hols the currently paused tasks.
+   */
+  private paused = new Array<SubscribableQueueItem>();
+  
+  /**
+   * Holds a queue of tasks waiting for execution.
    */
   private priorityQueue: FastPriorityQueue<SubscribableQueueItem>;
 
+  /**
+   * Holds the currently running tasks.
+   */
   private currentlyRunning = new Array<SubscribableQueueItem>();
 
-  private paused = new Array<SubscribableQueueItem>();
-
   private constructor(private concurrencyCount: number = 1) {
-    this.existingRequestsMap = new Map<number, boolean>();
-
     this.priorityQueue = new FastPriorityQueue((a, b) => {
       const aPriotiy =
         typeof a.task.priority === "function"
@@ -115,6 +124,7 @@ export default class ProcessingPriorityQueue {
 
   private async abortPaused(queueItem: SubscribableQueueItem): Promise<any> {
     this.paused.splice(this.paused.indexOf(queueItem), 1);
+    this.isPaused.set(queueItem.task.key, false);
     queueItem.rejectCallback(new Error('Paused task aborted'), 'eventual');
 
     return true;
@@ -140,6 +150,8 @@ export default class ProcessingPriorityQueue {
 
     if (currentlyRunningItem) {
       this.paused.push(currentlyRunningItem);
+      this.isPaused.set(currentlyRunningItem.task.key, true);
+
       const result = await currentlyRunningItem.createPromise("immediate");
       this.process();
       return result;
@@ -153,7 +165,10 @@ export default class ProcessingPriorityQueue {
     );
 
     if (queueItem) {
+      this.existingRequestsMap.set(queueItem.task.key, false);
       this.paused.push(queueItem);
+      this.isPaused.set(queueItem.task.key, true);
+
       return null;
     }
 
@@ -169,9 +184,11 @@ export default class ProcessingPriorityQueue {
 
     // remove the task from the paused queue
     this.paused = this.paused.filter((item) => item !== pausedItem);
+    this.isPaused.set(pausedItem.task.key, false);
 
     // add the task to the priority queue
     this.priorityQueue.add(pausedItem);
+    this.existingRequestsMap.set(pausedItem.task.key, true);
 
     // resume the task
     setImmediate(() => this.process());
