@@ -1,5 +1,7 @@
 import ProcessingPriorityQueue from "./ProcessingPriorityQueue";
 
+const DEFAULT_QUEUE_NAME = "default";
+
 interface PTaskOptions<T, R> {
   priority: number | (() => number);
   delay?: number; // ms
@@ -18,13 +20,21 @@ interface PTaskOptions<T, R> {
   queueName?: string;
 }
 
+type ExecutionStatus =
+  | "pending"
+  | "running"
+  | "paused"
+  | "canceled"
+  | "completed";
+
 export interface ExecInfo {
-  isPaused: () => boolean;
-  isCanceled: () => boolean;
+  getStatus: () => ExecutionStatus;
 }
 
 export class PTask<T, R> {
   private static count = 0;
+
+  private static pTaskLists = new Map<string, Array<PTask<any, any>>>();
 
   private _key: number = PTask.count++;
 
@@ -37,24 +47,21 @@ export class PTask<T, R> {
   private onPause: (args: T, resSoFar: R | null) => T;
 
   private onResume: (args: T, resSoFar: R | null) => T;
-  
-  private onCancel: () => void;
-  
-  private resultsMerge?: (resSoFar: R | null, newResult: R) => R;
-  
-  private queueName: string;
-  
-  private _args: any;
-  
-  private resSoFar: R | null = null;
-  
-  private paused = false;
-  
-  private canceled = false;
 
-  execInfo: ExecInfo = {
-    isPaused : () => this.paused,
-    isCanceled : () => this.canceled
+  private onCancel: () => void;
+
+  private resultsMerge?: (resSoFar: R | null, newResult: R) => R;
+
+  private queueName: string;
+
+  private _args: any;
+
+  private resSoFar: R | null = null;
+
+  private _status: ExecutionStatus = "pending";
+
+  public execInfo: ExecInfo = {
+    getStatus: () => this.status,
   };
 
   constructor(options: PTaskOptions<T, R>) {
@@ -65,38 +72,56 @@ export class PTask<T, R> {
     this.onPause = options.onPause || ((arg: T) => arg);
     this.onResume = options.onResume || ((arg: T) => arg);
     this.onCancel = options.onCancel || (() => {});
-    this.resultsMerge = options.resultsMerge || ((resSoFar: R | null, newResult: R) => newResult);
-    this.queueName = options.queueName || 'default';
+    this.resultsMerge =
+      options.resultsMerge || ((resSoFar: R | null, newResult: R) => newResult);
+    this.queueName = options.queueName || DEFAULT_QUEUE_NAME;
+
+    // Add this task to the list of tasks for this queue
+    if (!PTask.pTaskLists.has(this.queueName)) {
+      PTask.pTaskLists.set(this.queueName, []);
+    }
+
+    PTask.pTaskLists.get(this.queueName).push(this);
   }
 
   public async run(): Promise<R> {
-    const newRes = await ProcessingPriorityQueue.getInstance(this.queueName).enqueue(this);
-    return this.resultsMerge(this.resSoFar, newRes);
+    const newRes = await ProcessingPriorityQueue.getInstance(
+      this.queueName
+    ).enqueue(this);
+    const result = this.resultsMerge(this.resSoFar, newRes);
+    this.removeSelfFromQueue();
+    this._status = "completed";
+    return result;
   }
 
   public async pause(): Promise<void> {
-    if (this.paused) return;
+    if (this.status === "paused") return;
 
-    this.paused = true;
-    const newRes = await ProcessingPriorityQueue.getInstance(this.queueName).pause(this);
+    this._status = "paused";
+    const newRes = await ProcessingPriorityQueue.getInstance(
+      this.queueName
+    ).pause(this);
     this.resSoFar = this.resultsMerge(this.resSoFar, newRes);
     this._args = this.onPause(this.args, this.resSoFar);
   }
 
   public resume(): void {
-    if (!this.paused) return;
-  
+    if (this.status !== "paused") return;
+
+    this._status = "pending";
     this._args = this.onResume(this.args, this.resSoFar);
-    this.paused = false;
     ProcessingPriorityQueue.getInstance(this.queueName).resume(this);
   }
 
-  public async cancel({abort}: {abort: boolean} = {abort: false}): Promise<[boolean, string]> {
-    if (this.canceled) return [true, 'Already canceled'];
+  public async cancel(
+    { abort }: { abort: boolean } = { abort: false }
+  ): Promise<[boolean, string]> {
+    if (this.status === "canceled") return [true, "Already canceled"];
 
-    this.canceled = true;
+    const prevStatus = this._status;
+    this._status = "canceled";
     let result = true;
-    let message = 'Successfully canceled';
+    let message = "Successfully canceled";
 
     if (abort) {
       try {
@@ -117,12 +142,16 @@ export class PTask<T, R> {
         message = `${err.message}`;
       }
     }
-  
-    if (result) this.onCancel();
+
+    if (result) {
+      this.onCancel();
+    } else {
+      this._status = prevStatus;
+    }
     return [result, message];
   }
 
-  public set priority(p: number | (() => number)){
+  public set priority(p: number | (() => number)) {
     this._priority = p;
     ProcessingPriorityQueue.getInstance(this.queueName).updatePriority(this);
   }
@@ -140,6 +169,24 @@ export class PTask<T, R> {
   }
 
   public get onRun(): (args: T, execInfo?: ExecInfo) => Promise<R> {
-    return this._onRun;
+    return (args: T, execInfo?: ExecInfo) => {
+      this._status = "running";
+      return this._onRun(args, execInfo);
+    };
+  }
+
+  public get status(): ExecutionStatus {
+    return this._status;
+  }
+
+  private removeSelfFromQueue(): void {
+    PTask.pTaskLists
+      .get(this.queueName)
+      .splice(PTask.pTaskLists.get(this.queueName).indexOf(this), 1);
+  }
+
+  public static getAllPTasks(queueName?: string): Array<PTask<any, any>> {
+    if (!queueName) return [...PTask.pTaskLists.get(DEFAULT_QUEUE_NAME)] ?? [];
+    return [...PTask.pTaskLists.get(queueName)] ?? [];
   }
 }

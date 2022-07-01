@@ -25,7 +25,7 @@ export default class ProcessingPriorityQueue {
    * Hols the currently paused tasks.
    */
   private paused = new Array<SubscribableQueueItem>();
-  
+
   /**
    * Holds a queue of tasks waiting for execution.
    */
@@ -103,20 +103,22 @@ export default class ProcessingPriorityQueue {
 
   public async cancel(ptask: PTask<any, any>): Promise<boolean> {
     const item = this.priorityQueue.removeOne((item) => item.task === ptask);
-    if (!item) throw new Error('Task not found');
+    if (!item) throw new Error("Task not found");
 
     this.existingRequestsMap.set(item.task.key, false);
-    item.rejectCallback(new Error('Task canceled'), 'eventual');
+    item.rejectCallback(new Error("Task canceled"), "eventual");
     return true;
   }
 
   public async abort(ptask: PTask<any, any>): Promise<any> {
     // get the item and remove it from currently running
-    const currentlyRunningItem = this.currentlyRunning.find(item => item.task === ptask);
+    const currentlyRunningItem = this.currentlyRunning.find(
+      (item) => item.task === ptask
+    );
     if (currentlyRunningItem) return this.abortRunning(currentlyRunningItem);
-    
+
     // check if task is paused
-    const pausedItem = this.paused.find(item => item.task === ptask);
+    const pausedItem = this.paused.find((item) => item.task === ptask);
     if (pausedItem) return this.abortPaused(pausedItem);
 
     throw new Error("Cannot abort a task that is not running");
@@ -125,7 +127,7 @@ export default class ProcessingPriorityQueue {
   private async abortPaused(queueItem: SubscribableQueueItem): Promise<any> {
     this.paused.splice(this.paused.indexOf(queueItem), 1);
     this.isPaused.set(queueItem.task.key, false);
-    queueItem.rejectCallback(new Error('Paused task aborted'), 'eventual');
+    queueItem.rejectCallback(new Error("Paused task aborted"), "eventual");
 
     return true;
   }
@@ -133,10 +135,10 @@ export default class ProcessingPriorityQueue {
   private async abortRunning(queueItem: SubscribableQueueItem): Promise<any> {
     this.currentlyRunning.splice(this.currentlyRunning.indexOf(queueItem), 1);
     try {
-      await queueItem.createPromise('immediate');
-    } catch {}
-    finally {
-      queueItem.rejectCallback(new Error('Running task aborted'), 'eventual');
+      await queueItem.createPromise("immediate");
+    } catch {
+    } finally {
+      queueItem.rejectCallback(new Error("Running task aborted"), "eventual");
     }
   }
 
@@ -204,10 +206,22 @@ export default class ProcessingPriorityQueue {
       item.task
         .onRun(item.task.args, item.task.execInfo)
         .then((result) => {
-          item.resolveCallback(result, item.task.execInfo.isCanceled() || item.task.execInfo.isPaused() ? 'immediate' : 'eventual');
+          item.resolveCallback(
+            result,
+            item.task.execInfo.getStatus() === "canceled" ||
+              item.task.execInfo.getStatus() === "paused"
+              ? "immediate"
+              : "eventual"
+          );
         })
         .catch((error) => {
-          item.rejectCallback(error, item.task.execInfo.isCanceled() || item.task.execInfo.isPaused() ? 'immediate' : 'eventual');
+          item.rejectCallback(
+            error,
+            item.task.execInfo.getStatus() === "canceled" ||
+              item.task.execInfo.getStatus() === "paused"
+              ? "immediate"
+              : "eventual"
+          );
         })
         .finally(async () => {
           // remove from currently running
@@ -223,7 +237,10 @@ export default class ProcessingPriorityQueue {
 
   static getInstance(queueName: string): ProcessingPriorityQueue {
     if (!ProcessingPriorityQueue.instances.has(queueName)) {
-      ProcessingPriorityQueue.instances.set(queueName, new ProcessingPriorityQueue(1));
+      ProcessingPriorityQueue.instances.set(
+        queueName,
+        new ProcessingPriorityQueue(1)
+      );
     }
 
     return ProcessingPriorityQueue.instances.get(queueName);

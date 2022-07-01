@@ -199,3 +199,20 @@ setTimeout(() => {
 ```
 
 `PTask.run()` will throw an error once task abortion is successfully complete. If the function passed to `onRun` doesn't implement a way to stop execution abrubtly, `PTask.run()` will not throw the abortion error untill the function's execution is complete; however, another task will be permited to start execution in the meantime.
+
+### Get the status of a task
+```js
+const task = new PTask<number, number>({
+    priority: 1,
+    onRun: async (a: number) => a, // The function to run
+    args: 1, // The value to be passed to the function
+});
+
+// Returns the current status of the task: 'pending', 'running', 'paused', 'canceled', 'completed'
+console.log(task.status);
+```
+
+### Get all tasks
+```js
+PTask.getAllPTasks();
+```

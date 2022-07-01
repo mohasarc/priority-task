@@ -57,7 +57,11 @@ export default class SubscribableQueueItem {
    * @param eventType The type of action to set callback for
    * @param callback The callback fot the action type
    */
-  private subscribe(eventType: "resolve" | "reject", listenerType: ListenerType, callback: Function) {
+  private subscribe(
+    eventType: "resolve" | "reject",
+    listenerType: ListenerType,
+    callback: Function
+  ) {
     switch (eventType) {
       case "resolve":
         this.resolveCallbacks[listenerType].push(callback);
