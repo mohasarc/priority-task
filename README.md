@@ -1,11 +1,25 @@
 # priority-task
 
-Helps running tasks based on priority without having to deal with a priority queue. additionally, provides a utility to pause, resume and abort task execution.         
+Helps running tasks based on priority without having to deal with implementing a priority queue from scratch. additionally, provides a utility to update the priority at runtime, as well as, pause, resume and abort task execution.
 
 [![Tests](https://github.com/mohasarc/priority-task/actions/workflows/run-tests.yml/badge.svg)](https://github.com/mohasarc/priority-task/actions/workflows/run-tests.yml)
 ![Coveralls](https://img.shields.io/coveralls/github/mohasarc/priority-task)         
 
 Using `priority-task` you need to only create the tasks, assign them priority, and run them. `priority-task` will take care of running them in order.
+
+## Time Complexity
+This util generally runs in `O(log n)` time complexity, meaning most common operations run in `O(log n)` time complexity, here is a breakdown of each operation and it's time complexity:
+
+| operation                       | time complexity |
+|---------------------------------|-----------------|
+| create a new task               | O(log n)        |
+| internally run highest priority | O(log n)        |
+| update priority                 | O(log n)        |
+| pause                           | O(1)            |
+| resume                          | O(log n)        |
+| cancel/abort                    | O(1)            |
+
+Note to be able to have `O(log n)` time complexity for `update priority` and `pause` operations, a tag is used to mark invalid items in the heap, and re-insert them later. This means that the heap can have duplicates, causing increased memory consumption; however, for most practical uses this is ignorable.
 
 ## Installing the package
 
@@ -194,11 +208,19 @@ setTimeout(() => {
     console.log(p1RunCount < 10); // true
     console.log(p2RunCount > 10); // true
 
-    ptask2.cancel({abort: true}); // abort the 2nd task so it doesn't run for ∞
+    // abort the 2nd task so it doesn't run for ∞
+    ptask2.cancel({abort: true});
 }, 3000);
 ```
 
 `PTask.run()` will throw an error once task abortion is successfully complete. If the function passed to `onRun` doesn't implement a way to stop execution abrubtly, `PTask.run()` will not throw the abortion error untill the function's execution is complete; however, another task will be permited to start execution in the meantime.
+
+### Get the status of a task
+The priority of any task can be updated at any time given that the task hasn't started running yet.
+
+```js
+task.priority = 5;
+```
 
 ### Get the status of a task
 ```js
@@ -208,7 +230,8 @@ const task = new PTask<number, number>({
     args: 1, // The value to be passed to the function
 });
 
-// Returns the current status of the task: 'pending', 'running', 'paused', 'canceled', 'completed'
+// Returns the current status of the task:
+// 'pending', 'running', 'paused', 'canceled', 'completed'
 console.log(task.status);
 ```
 

@@ -384,33 +384,52 @@ describe("PriorityTask", () => {
     });
   });
 
-  it("should accept a function for priority", (done) => {
+  it("should update priority after tasks started running", (done) => {
+    const priorityMap = new Map<number, number>();
+
+    const delayedOnRun = async (a: number) => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return a;
+    };
+
     // Prepare tasks
     const task1 = new PTask<number, number>({
-      priority: () => 1,
+      priority: 1,
       args: 1,
-      onRun: async (a: number) => a,
+      onRun: delayedOnRun,
     });
 
     const task2 = new PTask<number, number>({
-      priority: () => 2,
+      priority: 2,
       args: 2,
-      onRun: async (a: number) => a,
+      onRun: delayedOnRun,
     });
 
     const task3 = new PTask<number, number>({
-      priority: () => 3,
+      priority: 3,
       args: 3,
-      onRun: async (a: number) => a,
+      onRun: delayedOnRun,
+    });
+
+    const task4 = new PTask<number, number>({
+      priority: 4,
+      args: 4,
+      onRun: delayedOnRun,
     });
 
     const res: number[] = [];
     const p2 = task2.run().then((val) => res.push(val));
     const p1 = task1.run().then((val) => res.push(val));
     const p3 = task3.run().then((val) => res.push(val));
+    const p4 = task4.run().then((val) => res.push(val));
 
-    Promise.all([p1, p2, p3]).then(() => {
-      expect(res).toEqual([3, 2, 1]);
+    task1.priority = 4;
+    task2.priority = 3;
+    task3.priority = 2;
+    task4.priority = 1;
+
+    Promise.all([p1, p2, p3, p4]).then(() => {
+      expect(res).toEqual([1, 2, 3, 4]);
       done();
     });
   });
@@ -616,21 +635,21 @@ describe("PriorityTask", () => {
   it("should provide the list of all tasks in a queue", (done) => {
     // Prepare tasks
     const rickTask1 = new PTask<number, number>({
-      priority: () => 1,
+      priority: 1,
       args: 1,
       onRun: async (a: number) => a,
       queueName: "rick",
     });
 
     const mortyTask1 = new PTask<number, number>({
-      priority: () => 2,
+      priority: 2,
       args: 2,
       onRun: async (a: number) => a,
       queueName: "morty",
     });
 
     const rickTask2 = new PTask<number, number>({
-      priority: () => 3,
+      priority: 3,
       args: 3,
       onRun: async (a: number) => a,
       queueName: "rick",

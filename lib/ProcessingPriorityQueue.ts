@@ -2,6 +2,11 @@ import FastPriorityQueue from "fastpriorityqueue";
 import { PTask } from "./PTask";
 import SubscribableQueueItem from "./SubscribableQueueItem";
 
+interface PriorityQueueItem<T> {
+  value: T;
+  valid: boolean;
+}
+
 /**
  * Singleton class that manages a queue of tasks.
  */
@@ -12,55 +17,41 @@ export default class ProcessingPriorityQueue {
   private static instances = new Map<string, ProcessingPriorityQueue>();
 
   /**
-   * This map is used to keep track of the tasks waiting for execution.
-   */
-  private existingRequestsMap = new Map<number, boolean>();
-
-  /**
    * This map is used to keep track of the paused tasks.
    */
-  private isPaused = new Map<number, boolean>();
-
-  /**
-   * Hols the currently paused tasks.
-   */
-  private paused = new Array<SubscribableQueueItem>();
-
-  /**
-   * Holds a queue of tasks waiting for execution.
-   */
-  private priorityQueue: FastPriorityQueue<SubscribableQueueItem>;
+  private pausedTasks = new Map<number, SubscribableQueueItem>();
 
   /**
    * Holds the currently running tasks.
    */
-  private currentlyRunning = new Array<SubscribableQueueItem>();
+  private currentlyRunning = new Map<number, SubscribableQueueItem>();
+
+  /**
+   * This map is used to keep track of the tasks waiting for execution.
+   */
+  private pendingTasks = new Map<number, PriorityQueueItem<SubscribableQueueItem>>();
+
+  /**
+   * Holds a prioritized heap of the pending tasks.
+   */
+  private priorityQueue: FastPriorityQueue<PriorityQueueItem<SubscribableQueueItem>>;
 
   private constructor(private concurrencyCount: number = 1) {
-    this.priorityQueue = new FastPriorityQueue((a, b) => {
-      const aPriotiy =
-        typeof a.task.priority === "function"
-          ? a.task.priority()
-          : a.task.priority;
-      const bPriotiy =
-        typeof b.task.priority === "function"
-          ? b.task.priority()
-          : b.task.priority;
-
-      return aPriotiy > bPriotiy;
-    });
+    this.priorityQueue = new FastPriorityQueue((
+      a: PriorityQueueItem<SubscribableQueueItem>,
+      b: PriorityQueueItem<SubscribableQueueItem>
+    ) => a.value.task.priority > b.value.task.priority);
   }
 
   public async enqueue(ptask: PTask<any, any>): Promise<any> {
-    let subscribableItem = this.getItem(ptask.key);
-
-    if (!subscribableItem) {
-      subscribableItem = new SubscribableQueueItem(ptask);
-      this.existingRequestsMap.set(ptask.key, true);
-      this.priorityQueue.add(subscribableItem);
+    if (!this.pendingTasks.has(ptask.key)) {
+      const subscribableItem = new SubscribableQueueItem(ptask);
+      const qItem = { value: subscribableItem, valid: true };
+      this.pendingTasks.set(ptask.key, qItem);
+      this.priorityQueue.add(qItem);
     }
 
-    const promise = subscribableItem.createPromise();
+    const promise = this.pendingTasks.get(ptask.key).value.createPromise();
     setImmediate(() => {
       this.process();
     });
@@ -68,72 +59,54 @@ export default class ProcessingPriorityQueue {
     return promise;
   }
 
-  private existInQueue(key: number): boolean {
-    return (
-      this.existingRequestsMap.has(key) && this.existingRequestsMap.get(key)
-    );
-  }
-
-  private getItem(key: number): SubscribableQueueItem {
-    if (!this.existInQueue(key)) return null;
-
-    const item = this.priorityQueue.removeOne(
-      (subscribableQueueItem: SubscribableQueueItem) => {
-        return subscribableQueueItem.task.key === key;
-      }
-    );
-
-    this.priorityQueue.add(item);
-    return item;
-  }
-
-  private popItem(): SubscribableQueueItem {
-    const item = this.priorityQueue.poll();
-    this.existingRequestsMap.set(item.task.key, false);
+  private poll(): PriorityQueueItem<SubscribableQueueItem> {
+    const item = this.priorityQueue.poll() as PriorityQueueItem<SubscribableQueueItem>;
+    this.pendingTasks.delete(item.value.task.key);
 
     return item;
   }
 
   public updatePriority(ptask: PTask<any, any>): void {
-    const comparisonFunction = (item: SubscribableQueueItem) =>
-      item.task.key === ptask.key;
-    const queueItemTemp = this.priorityQueue.removeOne(comparisonFunction);
-    if (queueItemTemp) this.priorityQueue.add(queueItemTemp);
+    if(!this.pendingTasks.has(ptask.key)) return;
+
+    const qItem = this.pendingTasks.get(ptask.key);
+    qItem.valid = false;
+    
+    const newQItem = { value: qItem.value, valid: true }
+    this.pendingTasks.set(ptask.key, newQItem);
+    this.priorityQueue.add(newQItem);
   }
 
   public async cancel(ptask: PTask<any, any>): Promise<boolean> {
-    const item = this.priorityQueue.removeOne((item) => item.task === ptask);
-    if (!item) throw new Error("Task not found");
+    if (!this.pendingTasks.has(ptask.key)) throw new Error("Task not found");
 
-    this.existingRequestsMap.set(item.task.key, false);
-    item.rejectCallback(new Error("Task canceled"), "eventual");
+    const qItem = this.pendingTasks.get(ptask.key);
+    qItem.valid = false;
+    qItem.value.rejectCallback(new Error("Task canceled"), "eventual");
     return true;
   }
 
   public async abort(ptask: PTask<any, any>): Promise<any> {
     // get the item and remove it from currently running
-    const currentlyRunningItem = this.currentlyRunning.find(
-      (item) => item.task === ptask
-    );
-    if (currentlyRunningItem) return this.abortRunning(currentlyRunningItem);
+    if (this.currentlyRunning.has(ptask.key))
+      return this.abortRunning(this.currentlyRunning.get(ptask.key));
 
     // check if task is paused
-    const pausedItem = this.paused.find((item) => item.task === ptask);
-    if (pausedItem) return this.abortPaused(pausedItem);
+    if (this.pausedTasks.has(ptask.key))
+      return this.abortPaused(this.pausedTasks.get(ptask.key));
 
     throw new Error("Cannot abort a task that is not running");
   }
 
   private async abortPaused(queueItem: SubscribableQueueItem): Promise<any> {
-    this.paused.splice(this.paused.indexOf(queueItem), 1);
-    this.isPaused.set(queueItem.task.key, false);
+    this.pausedTasks.delete(queueItem.task.key);
     queueItem.rejectCallback(new Error("Paused task aborted"), "eventual");
 
     return true;
   }
 
   private async abortRunning(queueItem: SubscribableQueueItem): Promise<any> {
-    this.currentlyRunning.splice(this.currentlyRunning.indexOf(queueItem), 1);
+    this.currentlyRunning.delete(queueItem.task.key);
     try {
       await queueItem.createPromise("immediate");
     } catch {
@@ -146,15 +119,12 @@ export default class ProcessingPriorityQueue {
     /**
      * Check if the task is currently running
      */
-    const currentlyRunningItem = this.currentlyRunning.find(
-      (item) => item.task === ptask
-    );
+    if (this.currentlyRunning.has(ptask.key)) {
+      // TODO: THIS PROBABLY DON'T WORK - Actually might work but cause a memory leak
+      const currentlyRunningTask = this.currentlyRunning.get(ptask.key);
+      this.pausedTasks.set(currentlyRunningTask.task.key, currentlyRunningTask);
 
-    if (currentlyRunningItem) {
-      this.paused.push(currentlyRunningItem);
-      this.isPaused.set(currentlyRunningItem.task.key, true);
-
-      const result = await currentlyRunningItem.createPromise("immediate");
+      const result = await currentlyRunningTask.createPromise("immediate");
       this.process();
       return result;
     }
@@ -162,14 +132,11 @@ export default class ProcessingPriorityQueue {
     /**
      * Check if the task hasn't started yet
      */
-    const queueItem = this.priorityQueue.removeOne(
-      (item: SubscribableQueueItem) => item.task === ptask
-    );
-
-    if (queueItem) {
-      this.existingRequestsMap.set(queueItem.task.key, false);
-      this.paused.push(queueItem);
-      this.isPaused.set(queueItem.task.key, true);
+    if (this.pendingTasks.has(ptask.key)) {
+      const qItem = this.pendingTasks.get(ptask.key);
+      qItem.valid = false;
+      this.pausedTasks.set(ptask.key, this.pendingTasks.get(ptask.key).value);
+      this.pendingTasks.delete(ptask.key);
 
       return null;
     }
@@ -178,59 +145,63 @@ export default class ProcessingPriorityQueue {
   }
 
   public async resume(ptask: PTask<any, any>): Promise<any> {
-    // find the task in the paused queue
-    const pausedItem = this.paused.find((item) => item.task === ptask);
+    if (!this.pausedTasks.has(ptask.key)) return null;
+    
+    const pausedItem = this.pausedTasks.get(ptask.key);
+    this.pausedTasks.delete(pausedItem.task.key);
 
-    // if the task is not paused, return null
-    if (!pausedItem) return null;
-
-    // remove the task from the paused queue
-    this.paused = this.paused.filter((item) => item !== pausedItem);
-    this.isPaused.set(pausedItem.task.key, false);
-
-    // add the task to the priority queue
-    this.priorityQueue.add(pausedItem);
-    this.existingRequestsMap.set(pausedItem.task.key, true);
+    // Add the task to the priority queue
+    const qItem = { value: pausedItem, valid: true };
+    this.pendingTasks.set(pausedItem.task.key, qItem);
+    this.priorityQueue.add(qItem);
 
     // resume the task
     setImmediate(() => this.process());
   }
 
   private async process(): Promise<void> {
+    const proceedWithNextItem = (curTask: SubscribableQueueItem) => {
+      // remove from currently running
+      this.currentlyRunning.delete(curTask.task.key);
+
+      this.concurrencyCount++;
+      this.process();
+    }
+
     if (this.concurrencyCount > 0 && this.priorityQueue.size > 0) {
       this.concurrencyCount--;
 
-      const item = this.popItem();
-      this.currentlyRunning.push(item);
+      const {value: sqItem, valid} = this.poll();
+      this.currentlyRunning.set(sqItem.task.key, sqItem);
+
+      if (!valid) {
+        proceedWithNextItem(sqItem);
+        return;
+      }
+
       /* Process the item with the given procedure */
-      item.task
-        .onRun(item.task.args, item.task.execInfo)
+      sqItem.task
+        .onRun(sqItem.task.args, sqItem.task.execInfo)
         .then((result) => {
-          item.resolveCallback(
+          sqItem.resolveCallback(
             result,
-            item.task.execInfo.getStatus() === "canceled" ||
-              item.task.execInfo.getStatus() === "paused"
+            sqItem.task.execInfo.getStatus() === "canceled" ||
+              sqItem.task.execInfo.getStatus() === "paused"
               ? "immediate"
               : "eventual"
           );
         })
         .catch((error) => {
-          item.rejectCallback(
+          sqItem.rejectCallback(
             error,
-            item.task.execInfo.getStatus() === "canceled" ||
-              item.task.execInfo.getStatus() === "paused"
+            sqItem.task.execInfo.getStatus() === "canceled" ||
+              sqItem.task.execInfo.getStatus() === "paused"
               ? "immediate"
               : "eventual"
           );
         })
         .finally(async () => {
-          // remove from currently running
-          this.currentlyRunning = this.currentlyRunning.filter(
-            (item) => item !== item
-          );
-
-          this.concurrencyCount++;
-          this.process();
+          proceedWithNextItem(sqItem);
         });
     }
   }

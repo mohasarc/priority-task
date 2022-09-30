@@ -3,7 +3,7 @@ import ProcessingPriorityQueue from "./ProcessingPriorityQueue";
 const DEFAULT_QUEUE_NAME = "default";
 
 interface PTaskOptions<T, R> {
-  priority: number | (() => number);
+  priority: number;
   delay?: number; // ms
   args: T;
   onRun: (args: T, execInfo?: ExecInfo) => Promise<R>;
@@ -38,7 +38,7 @@ export class PTask<T, R> {
 
   private _key: number = PTask.count++;
 
-  private _priority: number | (() => number);
+  private _priority: number;
 
   private delay: number;
 
@@ -151,12 +151,12 @@ export class PTask<T, R> {
     return [result, message];
   }
 
-  public set priority(p: number | (() => number)) {
+  public set priority(p: number) {
     this._priority = p;
     ProcessingPriorityQueue.getInstance(this.queueName).updatePriority(this);
   }
 
-  public get priority(): number | (() => number) {
+  public get priority(): number {
     return this._priority;
   }
 
