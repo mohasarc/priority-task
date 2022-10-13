@@ -215,11 +215,20 @@ setTimeout(() => {
 
 `PTask.run()` will throw an error once task abortion is successfully complete. If the function passed to `onRun` doesn't implement a way to stop execution abrubtly, `PTask.run()` will not throw the abortion error untill the function's execution is complete; however, another task will be permited to start execution in the meantime.
 
-### Get the status of a task
+### Update the priority of a task
 The priority of any task can be updated at any time given that the task hasn't started running yet.
 
 ```js
 task.priority = 5;
+```
+
+### Set the concurrency limit
+This property limits the number of concurrently running tasks. The default value is `1`. The limit can be set or changed at any time.        
+
+If `queueName` is not provided, it will set the limit of the default queue.
+
+```ts
+PTask.setConcurrencyLimit(limit: number, queueName?: string | undefined): void
 ```
 
 ### Get the status of a task

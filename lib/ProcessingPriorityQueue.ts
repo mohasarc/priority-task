@@ -36,11 +36,17 @@ export default class ProcessingPriorityQueue {
    */
   private priorityQueue: FastPriorityQueue<PriorityQueueItem<SubscribableQueueItem>>;
 
-  private constructor(private concurrencyCount: number = 1) {
+  private currentConcurrencyCount = 0;
+
+  private constructor(private concurrencyLimit: number = 1) {
     this.priorityQueue = new FastPriorityQueue((
       a: PriorityQueueItem<SubscribableQueueItem>,
       b: PriorityQueueItem<SubscribableQueueItem>
     ) => a.value.task.priority > b.value.task.priority);
+  }
+
+  public setConcurrencyLimit(concurrencyLimit: number): void {
+    this.concurrencyLimit = concurrencyLimit;
   }
 
   public async enqueue(ptask: PTask<any, any>): Promise<any> {
@@ -164,12 +170,12 @@ export default class ProcessingPriorityQueue {
       // remove from currently running
       this.currentlyRunning.delete(curTask.task.key);
 
-      this.concurrencyCount++;
+      this.currentConcurrencyCount--;
       this.process();
     }
 
-    if (this.concurrencyCount > 0 && this.priorityQueue.size > 0) {
-      this.concurrencyCount--;
+    if (this.currentConcurrencyCount <= this.concurrencyLimit && this.priorityQueue.size > 0) {
+      this.currentConcurrencyCount++;
 
       const {value: sqItem, valid} = this.poll();
       this.currentlyRunning.set(sqItem.task.key, sqItem);
@@ -210,7 +216,7 @@ export default class ProcessingPriorityQueue {
     if (!ProcessingPriorityQueue.instances.has(queueName)) {
       ProcessingPriorityQueue.instances.set(
         queueName,
-        new ProcessingPriorityQueue(1)
+        new ProcessingPriorityQueue()
       );
     }
 

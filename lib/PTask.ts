@@ -1,6 +1,7 @@
 import ProcessingPriorityQueue from "./ProcessingPriorityQueue";
 
 const DEFAULT_QUEUE_NAME = "default";
+const DEFAULT_CONCURRENCY_LIMIT = 1;
 
 interface PTaskOptions<T, R> {
   priority: number;
@@ -183,6 +184,10 @@ export class PTask<T, R> {
     PTask.pTaskLists
       .get(this.queueName)
       .splice(PTask.pTaskLists.get(this.queueName).indexOf(this), 1);
+  }
+
+  public static setConcurrencyLimit(limit: number, queueName: string = DEFAULT_QUEUE_NAME): void {
+    ProcessingPriorityQueue.getInstance(queueName).setConcurrencyLimit(limit);
   }
 
   public static getAllPTasks(queueName?: string): Array<PTask<any, any>> {
