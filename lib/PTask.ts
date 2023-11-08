@@ -191,7 +191,12 @@ export class PTask<T, R> {
   }
 
   public static getAllPTasks(queueName?: string): Array<PTask<any, any>> {
-    if (!queueName) return [...PTask.pTaskLists.get(DEFAULT_QUEUE_NAME)] ?? [];
-    return [...PTask.pTaskLists.get(queueName)] ?? [];
+    if (!queueName) {
+      return PTask.pTaskLists.get(DEFAULT_QUEUE_NAME)
+        ? [...PTask.pTaskLists.get(DEFAULT_QUEUE_NAME)]
+        : []
+    }
+
+    return PTask.pTaskLists.get(queueName) ? [...PTask.pTaskLists.get(queueName)] : [];
   }
 }
