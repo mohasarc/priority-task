@@ -174,7 +174,7 @@ export default class ProcessingPriorityQueue {
       this.process();
     }
 
-    if (this.currentConcurrencyCount <= this.concurrencyLimit && this.priorityQueue.size > 0) {
+    if (this.currentConcurrencyCount < this.concurrencyLimit && this.priorityQueue.size > 0) {
       this.currentConcurrencyCount++;
 
       const {value: sqItem, valid} = this.poll();

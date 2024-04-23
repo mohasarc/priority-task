@@ -685,4 +685,38 @@ describe("PriorityTask", () => {
     });
     expect(PTask.getAllPTasks("krombopulos").length).toBe(1);
   });
+
+  it("should not schedule more than concurrencyLimit items", (done) => {
+    const CONCURRENCY_LIMIT = 2;
+    PTask.setConcurrencyLimit(CONCURRENCY_LIMIT);
+
+    const delayedOnRun = async (a: number) => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return a;
+    };
+
+    // Prepare tasks
+    const ptasks = Array.from({ length: CONCURRENCY_LIMIT + 1 }).map((_, i) => {
+      return new PTask<number, number>({
+        priority: i,
+        args: i,
+        onRun: delayedOnRun,
+      });
+    });
+
+    // run all tasks
+    const promises = ptasks.map((ptask) => ptask.run());
+
+    setTimeout(() => {
+      const runningTasks = PTask.getAllPTasks().filter((ptask) => ptask.status === "running");
+      const pendingTasks = PTask.getAllPTasks().filter((ptask) => ptask.status === "pending");
+
+      expect(runningTasks.length).toBe(CONCURRENCY_LIMIT);
+      expect(pendingTasks.length).toBe(1);
+
+      Promise.all(promises).then(() => {
+        done()
+      });
+    }, 10);
+  })
 });
