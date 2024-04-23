@@ -688,7 +688,8 @@ describe("PriorityTask", () => {
 
   it("should not schedule more than concurrencyLimit items", (done) => {
     const CONCURRENCY_LIMIT = 2;
-    PTask.setConcurrencyLimit(CONCURRENCY_LIMIT);
+    const QUEUE_NAME = 'dubdub'
+    PTask.setConcurrencyLimit(CONCURRENCY_LIMIT, QUEUE_NAME);
 
     const delayedOnRun = async (a: number) => {
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -701,6 +702,7 @@ describe("PriorityTask", () => {
         priority: i,
         args: i,
         onRun: delayedOnRun,
+        queueName: QUEUE_NAME,
       });
     });
 
@@ -708,8 +710,8 @@ describe("PriorityTask", () => {
     const promises = ptasks.map((ptask) => ptask.run());
 
     setTimeout(() => {
-      const runningTasks = PTask.getAllPTasks().filter((ptask) => ptask.status === "running");
-      const pendingTasks = PTask.getAllPTasks().filter((ptask) => ptask.status === "pending");
+      const runningTasks = PTask.getAllPTasks(QUEUE_NAME).filter((ptask) => ptask.status === "running");
+      const pendingTasks = PTask.getAllPTasks(QUEUE_NAME).filter((ptask) => ptask.status === "pending");
 
       expect(runningTasks.length).toBe(CONCURRENCY_LIMIT);
       expect(pendingTasks.length).toBe(1);
@@ -718,5 +720,5 @@ describe("PriorityTask", () => {
         done()
       });
     }, 10);
-  })
+  });
 });
