@@ -47,6 +47,7 @@ export default class ProcessingPriorityQueue {
 
   public setConcurrencyLimit(concurrencyLimit: number): void {
     this.concurrencyLimit = concurrencyLimit;
+    this.process()
   }
 
   public async enqueue(ptask: PTask<any, any>): Promise<any> {

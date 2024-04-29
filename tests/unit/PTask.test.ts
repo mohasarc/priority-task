@@ -721,4 +721,42 @@ describe("PriorityTask", () => {
       });
     }, 10);
   });
+
+  it("should start previously schedules tasks when concurrencyLimit is increased", (done) => {
+    const CONCURRENCY_LIMIT = 2;
+    const QUEUE_NAME = 'pokeymans'
+    PTask.setConcurrencyLimit(CONCURRENCY_LIMIT, QUEUE_NAME);
+
+    const delayedOnRun = async (a: number) => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return a;
+    };
+
+    // Prepare tasks
+    const ptasks = Array.from({ length: CONCURRENCY_LIMIT + 1 }).map((_, i) => {
+      return new PTask<number, number>({
+        priority: i,
+        args: i,
+        onRun: delayedOnRun,
+        queueName: QUEUE_NAME,
+      });
+    });
+
+    // run all tasks
+    const promises = ptasks.map((ptask) => ptask.run());
+
+    setTimeout(() => {
+      PTask.setConcurrencyLimit(CONCURRENCY_LIMIT + 1, QUEUE_NAME);
+
+      const runningTasks = PTask.getAllPTasks(QUEUE_NAME).filter((ptask) => ptask.status === "running");
+      const pendingTasks = PTask.getAllPTasks(QUEUE_NAME).filter((ptask) => ptask.status === "pending");
+
+      expect(runningTasks.length).toBe(CONCURRENCY_LIMIT + 1);
+      expect(pendingTasks.length).toBe(0);
+
+      Promise.all(promises).then(() => {
+        done()
+      });
+    }, 10);
+  });
 });
