@@ -670,7 +670,7 @@ describe("PriorityTask", () => {
     });
   });
 
-  it("should be removed from the queue when complete", (done) => {
+  it("should be removed from the queue when complete successfully", (done) => {
     const ptask = new PTask<void, void>({
       args: undefined,
       priority: 1,
@@ -685,6 +685,23 @@ describe("PriorityTask", () => {
     });
     expect(PTask.getAllPTasks("krombopulos").length).toBe(1);
   });
+  
+  it('should be removed from the queue when complete unsuccessfully', (done) => {
+    const ptask = new PTask<void, void>({
+      args: undefined,
+      priority: 1,
+      onRun: async () =>
+        await new Promise((resolve, reject) => setTimeout(reject, 500)),
+      queueName: "krombopulos-2",
+    });
+
+    ptask.run()
+    .catch(() => {
+      expect(PTask.getAllPTasks("krombopulos-2").length).toBe(0);
+      done();
+    });
+    expect(PTask.getAllPTasks("krombopulos-2").length).toBe(1);
+  })
 
   it("should not schedule more than concurrencyLimit items", (done) => {
     const CONCURRENCY_LIMIT = 2;

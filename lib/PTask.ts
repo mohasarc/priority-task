@@ -86,13 +86,18 @@ export class PTask<T, R> {
   }
 
   public async run(): Promise<R> {
-    const newRes = await ProcessingPriorityQueue.getInstance(
-      this.queueName
-    ).enqueue(this);
-    const result = this.resultsMerge(this.resSoFar, newRes);
-    this.removeSelfFromQueue();
-    this._status = "completed";
-    return result;
+    try {
+      const newRes = await ProcessingPriorityQueue.getInstance(
+        this.queueName
+      ).enqueue(this);
+      
+      return this.resultsMerge(this.resSoFar, newRes);
+    } finally {
+      this.removeSelfFromQueue();
+      if (this._status === 'running') {
+        this._status = "completed";
+      }
+    }
   }
 
   public async pause(): Promise<void> {
